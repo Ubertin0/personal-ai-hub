@@ -1,14 +1,46 @@
-services:
-  nextchat:
-    image: yidadaa/chatgpt-next-web:latest
-    container_name: nextchat
-    restart: always
-    network_mode: "host"
-    environment:
-      - OPENAI_API_KEY=<YOUR_OPENROUTER_KEY>
-      - BASE_URL=https://openrouter.ai/api
-      - CUSTOM_MODELS=+arcee-ai/trinity-large-preview:free,+z-ai/glm-4.5-air:free,+stepfun/step-3.5-flash:free,+nvidia/nemotron-3-nano-30b-a3b:free,+meta-llama/llama-3.3-70b-instruct:free,+openrouter/free
-      - PROXY_URL=socks5://127.0.0.1:40000
-      - HIDE_USER_API_KEY=1
-      - CODE=user1,user2
+version: '3.8'
 
+services:
+  # 1. Корпоративный UI (ChatGPT Next Web)
+  chat-ui:
+    image: yidadaa/chatgpt-next-web:latest
+    container_name: secure-ai-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - ai_secure_net
+    env_file:
+      - .env
+    depends_on:
+      - xray-router
+
+  # 2. Ядро маршрутизации (Xray)
+  xray-router:
+    image: enwaiax/x-ui:latest # Или любой другой образ 3x-ui, который ты используешь
+    container_name: xray-core
+    restart: unless-stopped
+    ports:
+      - "2053:2053" # Порт панели управления
+    networks:
+      - ai_secure_net
+    volumes:
+      - ./xray/db/:/etc/x-ui/
+      - ./xray/cert/:/root/cert/
+
+  # 3. Прокси-слой (Cloudflare WARP)
+  warp-proxy:
+    image: caomingjun/warp:latest
+    container_name: warp-socks5
+    restart: unless-stopped
+    networks:
+      - ai_secure_net
+    environment:
+      - WARP_SLEEP=2
+    cap_add:
+      - NET_ADMIN
+
+networks:
+  ai_secure_net:
+    driver: bridge
+    name: ai_corporate_bridge
